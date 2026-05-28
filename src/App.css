@@ -1,0 +1,37 @@
+.service-card-acknowledged {
+  align-items: center;
+  border: 5px solid;
+  padding: 12px;
+  border-radius: 30px;
+  opacity: 0.3;
+}
+
+.service-card {
+  align-items: center;
+  border: 5px solid;
+  padding: 12px;
+  border-radius: 30px;
+  justify-content: space-between;
+}
+
+.service-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-card__action-button {
+  margin-left: auto;
+}
+
+.service-card--healthy {
+  border-color: green;
+}
+
+.service-card--degraded {
+  border-color: yellow;
+}
+
+.service-card--down {
+  border-color: red;
+}
