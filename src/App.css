@@ -1,8 +1,4 @@
-.service-card-acknowledged {
-  align-items: center;
-  border: 5px solid;
-  padding: 12px;
-  border-radius: 30px;
+.service-card--acknowledged {
   opacity: 0.3;
 }
 

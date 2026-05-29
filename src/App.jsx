@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import clsx from 'clsx';
 import './App.css';
 
 const services = [
@@ -15,37 +16,66 @@ const sortedServices = [...services].sort(
     (a, b) => statusPriority[a.status] - statusPriority[b.status]
   );
 
-function PodStatus() {
+function RestartButton(props){
+  const [count, setCount] = useState(0);
+
+  function handleClick() {
+    alert(`Restarting ${props.serviceName}`);
+    setCount(count + 1);
+  }
+
   return (
-    <div className="pod">
-      <h2>nginx-7d4f8c-x9k2m</h2>
-      <p>Status: Running<br />
-      Restarts: 0
-      </p>
-      <img src="/icons/healthy.svg"></img>
+    <div>
+      <p>Restarted {count} times.</p>
+      <button className="service-card__action-button" onClick={handleClick}>
+        Restart
+      </button>
     </div>
-  )
+  );
 }
 
-function restartService(serviceName) {
-  alert(`Restarting ${serviceName}`);
+function AckAllButton(props) {
+  function ackAllClick() {
+    props.setMainAckState(prevStates => 
+      Object.fromEntries(
+        Object.entries(prevStates).map(([id, value]) => [id, true])
+      )
+    )
+  }
+
+  return (
+    <div>
+      <button className="service-card__action-button" onClick={ackAllClick}>
+        Acknowledge All Services
+      </button>
+    </div>
+  )
+
 }
 
 function AckButton(props) {
   
   function acknowledgeClick() {
-    props.setAcknowledge(true);
+    props.setMainAckState(prevStates => {
+      return {
+        ...prevStates,
+        [props.serviceId]: !prevStates[props.serviceId]
+      };
+    });
   }
 
   return (
-    <button className="service-card__action-button" onClick={acknowledgeClick}>
-      {props.acknowledged ? ('Acknowledged') : ('Acknowledge') }
-    </button>
+    <div>
+      <button className="service-card__action-button" onClick={acknowledgeClick}>
+        { props.mainAckState[props.serviceId] ? ('Deacknowledge') : ('Acknowledge') }
+      </button>
+    </div>
   )
 }
 
-function ServiceCard({service}) {
-  const [acknowledged, setAcknowledge] = useState(false);
+function ServiceCard(props) {
+  const service = props.service;
+
   const cpuColor = service.cpuPercent > 80 ? 'red' : 'inherit';
 
   let content;
@@ -57,17 +87,15 @@ function ServiceCard({service}) {
     content = <p>❌ Service unavailable</p>;
   }
 
-
-  let serviceClassName
-  if (acknowledged) {
-    serviceClassName = `service-card-acknowledged service-card--${service.status}`
-  } else {
-    serviceClassName = `service-card service-card--${service.status}`
-  }
+  const classes = clsx(
+    'service-card',
+    `service-card--${service.status}`,
+    props.mainAckState[service.id] && 'service-card--acknowledged'
+  );
 
   return (
     <div className="service-card__body">
-      <div className={serviceClassName}>
+      <div className={classes}>
         <h2>{service.namespace}/{service.name}</h2>
         <p>Replicas: {service.replicas}</p>
         <p style={{ color: cpuColor }}>CPU: {service.cpuPercent}%</p>
@@ -75,75 +103,40 @@ function ServiceCard({service}) {
         {content}
       </div>
 
-      <button className="service-card__action-button" onClick={() => restartService(service.name)}>
-        Restart
-      </button>
+      <RestartButton serviceName={service.name} serviceStatus={service.status} />
 
-      <AckButton acknowledged={acknowledged} setAcknowledge={setAcknowledge} />
-      
+      <AckButton mainAckState={props.mainAckState} setMainAckState={props.setMainAckState} serviceId={service.id} />
+
     </div>
   );
 
 }
 
 function ServicesList() {
-  return (
-    <ul>
-      {sortedServices.map(service => {
-        return (
-          <li key={service.id}>
-            <ServiceCard service={service} />
-          </li>
-      )})}
-    </ul>
+  const mainAckStateInit = Object.fromEntries(
+    sortedServices.map(service => [service.id, false])
   )
-}
 
-function ServicesListClassic() {
-  const listItems = sortedServices.map((service) => {
-    let content;
-    if (service.status === 'healthy') {
-      content = <p>✅</p>;
-    } else if (service.status === 'degraded') {
-      content = <p>⚠️ Degraded - check logs</p>;
-    } else if (service.status === 'down') {
-      content = <p>❌ Service unavailable</p>;
-    }
+  const [mainAckState, setMainAckState] = useState(mainAckStateInit);
 
-    const cpuColor = service.cpuPercent > 80 ? 'red' : 'inherit';
+  const servicesCount = Object.keys(mainAckState).length
+  const ackCount = Object.values(mainAckState).filter(Boolean).length;
 
-    const [acknowledged, setAcknowledge] = useState(false);
-
-    let serviceClassName
-    if (acknowledged) {
-      serviceClassName = `service-card-acknowledged service-card--${service.status}`
-    } else {
-      serviceClassName = `service-card service-card--${service.status}`
-    }
-
+  const listItems = sortedServices.map(service => {
     return (
       <li key={service.id}>
-        <div className="service-card__body">
-          <div className={serviceClassName}>
-            <h2>{service.namespace}/{service.name}</h2>
-            <p>Replicas: {service.replicas}</p>
-            <p style={{ color: cpuColor }}>CPU: {service.cpuPercent}%</p>
-            <p>Endpoint: https://{service.name}.{service.namespace}.svc.cluster.local</p>
-            {content}
-          </div>
-
-          <button className="service-card__action-button" onClick={() => restartService(service.name)}>
-            Restart
-          </button>
-
-          <AckButton acknowledged={acknowledged} setAcknowledge={setAcknowledge} />
-          
-        </div>
+        <ServiceCard service={service} mainAckState={mainAckState} setMainAckState={setMainAckState} />
       </li>
-    );
-  });
+    )
+  })
 
-  return <ul>{listItems}</ul>;
+  return (
+    <div>
+      <h2>{ackCount} of {servicesCount} acknowledged.</h2>
+      <AckAllButton mainAckState={mainAckState} setMainAckState={setMainAckState} />
+      {listItems}
+    </div>
+  )
 }
 
 function ServiceDashboard() {
