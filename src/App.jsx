@@ -1,20 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import './App.css';
 
-const services = [
-  { id: 1, name: 'sales-api', namespace: 'prod', replicas: 5, cpuPercent: 81, status: 'healthy'},
-  { id: 2, name: 'payment-api', namespace: 'prod', replicas: 3, cpuPercent: 79, status: 'healthy'},
-  { id: 3, name: 'cat-photo-api', namespace: 'test', replicas: 2, cpuPercent: 21, status: 'down'},
-  { id: 4, name: 'marketing-api', namespace: 'test', replicas: 7, cpuPercent: 44, status: 'healthy'},
-  { id: 5, name: 'cloud-api', namespace: 'prod', replicas: 2, cpuPercent: 56, status: 'degraded'},
-]
+// const services = [
+//   { id: 1, name: 'sales-api', namespace: 'prod', replicas: 5, cpuPercent: 81, status: 'healthy'},
+//   { id: 2, name: 'payment-api', namespace: 'prod', replicas: 3, cpuPercent: 79, status: 'healthy'},
+//   { id: 3, name: 'cat-photo-api', namespace: 'test', replicas: 2, cpuPercent: 21, status: 'down'},
+//   { id: 4, name: 'marketing-api', namespace: 'test', replicas: 7, cpuPercent: 44, status: 'healthy'},
+//   { id: 5, name: 'cloud-api', namespace: 'prod', replicas: 2, cpuPercent: 56, status: 'degraded'},
+// ]
 
 const statusPriority = { down: 0, degraded: 1, healthy: 2 };
-
-const sortedServices = [...services].sort(
-    (a, b) => statusPriority[a.status] - statusPriority[b.status]
-  );
 
 function RestartButton(props){
   const [count, setCount] = useState(0);
@@ -113,11 +109,39 @@ function ServiceCard(props) {
 }
 
 function ServicesList() {
-  const mainAckStateInit = Object.fromEntries(
-    sortedServices.map(service => [service.id, false])
-  )
+  // const mainAckStateInit = Object.fromEntries(
+  //   sortedServices.map(service => [service.id, false])
+  // )
 
-  const [mainAckState, setMainAckState] = useState(mainAckStateInit);
+  const [mainAckState, setMainAckState] = useState([]);
+
+  const [services, setServices] = useState([]);
+
+  // State setter (fetches services list from the backend)
+  useEffect(() => {
+    const fetchMetrics = () => 
+      fetch('http://localhost:8000/metrics')
+        .then((res) => res.json())
+        .then(setServices);
+    
+    fetchMetrics();
+    const id = setInterval(fetchMetrics, 3000);
+
+    return () => clearInterval(id);
+  }, []);
+
+  // reconciler - for acknowledgement state
+  useEffect(() => {
+    setMainAckState(prev => 
+      Object.fromEntries(
+        services.map(service => [service.id, prev[service.id] ?? false])
+      )
+    )
+  }, [services]);
+
+  const sortedServices = [...services].sort(
+    (a, b) => statusPriority[a.status] - statusPriority[b.status]
+  );
 
   const servicesCount = Object.keys(mainAckState).length
   const ackCount = Object.values(mainAckState).filter(Boolean).length;
