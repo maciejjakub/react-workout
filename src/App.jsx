@@ -130,15 +130,6 @@ function ServicesList() {
     return () => clearInterval(id);
   }, []);
 
-  // reconciler - for acknowledgement state
-  useEffect(() => {
-    setMainAckState(prev => 
-      Object.fromEntries(
-        services.map(service => [service.id, prev[service.id] ?? false])
-      )
-    )
-  }, [services]);
-
   const sortedServices = [...services].sort(
     (a, b) => statusPriority[a.status] - statusPriority[b.status]
   );
